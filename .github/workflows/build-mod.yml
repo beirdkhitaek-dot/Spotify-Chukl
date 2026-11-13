@@ -1,0 +1,29 @@
+name: Build Spotify Chukl mod
+on:
+  workflow_dispatch:
+  push:
+    paths: ['spotify-chukl-mod/**']
+env:
+  VERSION: 1.8.0
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Build
+        working-directory: spotify-chukl-mod
+        run: |
+          chmod +x gradlew
+          ./gradlew build --console=plain
+      - name: Name the jar with the version
+        run: |
+          mkdir -p out
+          cp "spotify-chukl-mod/build/libs/spotify-chukl-${VERSION}+1.21.11.jar" "out/SpotifyChukl-${VERSION}.jar"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SpotifyChukl-${{ env.VERSION }}
+          path: out/*.jar

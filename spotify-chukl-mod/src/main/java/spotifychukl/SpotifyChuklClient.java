@@ -1,0 +1,106 @@
+package spotifychukl;
+
+import com.mojang.brigadier.arguments.FloatArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import spotifychukl.gui.SettingsScreen;
+import spotifychukl.style.HudStyles;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
+import net.minecraft.util.Identifier;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.text.Text;
+
+public final class SpotifyChuklClient implements ClientModInitializer {
+    @Override
+    public void onInitializeClient() {
+        Config.load();
+        Tracker.start();
+        KeyBinding openKey = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.spotifychukl.open", InputUtil.Type.KEYSYM, 344,
+            KeyBinding.Category.create(Identifier.of("spotifychukl", "main")))); // 344 = Right Shift
+        ClientTickEvents.END_CLIENT_TICK.register(mc -> {
+            while (openKey.wasPressed()) {
+                if (mc.currentScreen == null) mc.setScreen(new SettingsScreen());
+            }
+        });
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
+            LiteralArgumentBuilder<FabricClientCommandSource> styleNode = ClientCommandManager.literal("style");
+            for (String id : HudStyles.ids()) {
+                styleNode.then(ClientCommandManager.literal(id).executes(ctx -> {
+                    Config.get().style = id;
+                    Config.save();
+                    return say(ctx, "Style set to " + id);
+                }));
+            }
+            styleNode.executes(ctx -> say(ctx, "Styles: " + String.join(", ", HudStyles.ids()) + " (now: " + Config.get().style + ")"));
+
+            dispatcher.register(ClientCommandManager.literal("spotifychukl")
+                .then(ClientCommandManager.literal("user").then(ClientCommandManager.argument("name", StringArgumentType.word())
+                    .executes(ctx -> {
+                        Config.get().user = StringArgumentType.getString(ctx, "name");
+                        Config.save();
+                        return say(ctx, "Backup Last.fm user set to " + Config.get().user);
+                    })))
+                .then(ClientCommandManager.literal("key").then(ClientCommandManager.argument("apikey", StringArgumentType.word())
+                    .executes(ctx -> {
+                        Config.get().apiKey = StringArgumentType.getString(ctx, "apikey");
+                        Config.save();
+                        return say(ctx, "API key saved.");
+                    })))
+                .then(ClientCommandManager.literal("toggle").executes(ctx -> {
+                    Config.get().enabled = !Config.get().enabled;
+                    Config.save();
+                    return say(ctx, Config.get().enabled ? "HUD on" : "HUD off");
+                }))
+                .then(ClientCommandManager.literal("gui").executes(ctx -> {
+                    net.minecraft.client.MinecraftClient.getInstance().send(() ->
+                        net.minecraft.client.MinecraftClient.getInstance().setScreen(new SettingsScreen()));
+                    return 1;
+                }))
+                .then(styleNode)
+                .then(ClientCommandManager.literal("lyrics").executes(ctx -> {
+                    Config.get().lyrics = !Config.get().lyrics;
+                    Config.save();
+                    return say(ctx, Config.get().lyrics ? "Lyrics on" : "Lyrics off");
+                }))
+                .then(ClientCommandManager.literal("syncoffset")
+                    .then(ClientCommandManager.argument("ms", IntegerArgumentType.integer(-10000, 10000)).executes(ctx -> {
+                        Config.get().lyricsOffsetMs = IntegerArgumentType.getInteger(ctx, "ms");
+                        Config.save();
+                        return say(ctx, "Lyrics offset set to " + Config.get().lyricsOffsetMs + " ms (positive = lyrics earlier)");
+                    })))
+                .then(ClientCommandManager.literal("pos")
+                    .then(ClientCommandManager.argument("x", IntegerArgumentType.integer(0, 4000))
+                        .then(ClientCommandManager.argument("y", IntegerArgumentType.integer(0, 4000)).executes(ctx -> {
+                            Config.get().x = IntegerArgumentType.getInteger(ctx, "x");
+                            Config.get().y = IntegerArgumentType.getInteger(ctx, "y");
+                            Config.save();
+                            return say(ctx, "Position set to " + Config.get().x + ", " + Config.get().y);
+                        }))))
+                .then(ClientCommandManager.literal("scale")
+                    .then(ClientCommandManager.argument("size", FloatArgumentType.floatArg(0.5f, 4.0f)).executes(ctx -> {
+                        Config.get().scale = FloatArgumentType.getFloat(ctx, "size");
+                        Config.save();
+                        return say(ctx, "Scale set to " + Config.get().scale);
+                    })))
+                .then(ClientCommandManager.literal("status").executes(ctx -> {
+                    Config c = Config.get();
+                    return say(ctx, (c.enabled ? "on" : "off") + ", style=" + c.style + ", lyrics=" + (c.lyrics ? "on" : "off")
+                        + ", user=" + (c.user.isBlank() ? "(not set)" : c.user)
+                        + ", key=" + (c.apiKey.isBlank() ? "(not set)" : "set") + ", " + Tracker.status());
+                })));
+        });
+    }
+
+    private static int say(CommandContext<FabricClientCommandSource> ctx, String message) {
+        ctx.getSource().sendFeedback(Text.literal("[Spotify Chukl] " + message));
+        return 1;
+    }
+}

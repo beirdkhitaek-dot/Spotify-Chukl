@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "spotifychukl",
+  "version": "${version}",
+  "name": "Spotify Chukl",
+  "description": "Shows the song you are playing on Spotify as a HUD. Works with the Spotify Chukl Android app. Works on Zalith.",
+  "authors": ["Chukl"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["spotifychukl.SpotifyChuklClient"]
+  },
+  "mixins": ["spotifychukl.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
