@@ -3,63 +3,170 @@ package com.chukl.spotifychukl
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
+import android.util.TypedValue
 import android.view.Gravity
-import android.widget.Button
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 
+/** Soft green "liquid glass" look: frosted translucent cards over a calm gradient. */
 class MainActivity : Activity() {
-    private lateinit var status: TextView
-    private lateinit var song: TextView
+    private val ink = Color.parseColor("#0E3B2B")
+    private val inkSoft = Color.parseColor("#4F7A68")
+    private val accent = Color.parseColor("#1FA971")
+
+    private lateinit var songTitle: TextView
+    private lateinit var songArtist: TextView
+    private lateinit var chip: TextView
+    private lateinit var timeLeft: TextView
+    private lateinit var timeRight: TextView
+    private lateinit var bar: GlassBar
+    private lateinit var step1State: TextView
     private val handler = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
-        override fun run() { render(); handler.postDelayed(this, 1000) }
+        override fun run() { render(); handler.postDelayed(this, 500) }
+    }
+
+    private fun dp(v: Int) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
+
+    private fun glass(radius: Int = 28, fill: String = "#59FFFFFF"): GradientDrawable = GradientDrawable().apply {
+        cornerRadius = dp(radius).toFloat()
+        setColor(Color.parseColor(fill))
+        setStroke(dp(1), Color.parseColor("#B3FFFFFF"))
+    }
+
+    private fun text(s: String, sp: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
+        text = s; setTextSize(TypedValue.COMPLEX_UNIT_SP, sp); setTextColor(color)
+        if (bold) typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+
+    private fun card(vararg views: View): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = glass()
+        elevation = dp(6).toFloat()
+        setPadding(dp(22), dp(20), dp(22), dp(20))
+        views.forEach { addView(it) }
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            .apply { topMargin = dp(16) }
+    }
+
+    private fun pill(label: String, onClick: () -> Unit) = TextView(this).apply {
+        text = label; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f); typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(Color.parseColor("#2BC48A"), Color.parseColor("#14946B")))
+            .apply { cornerRadius = dp(26).toFloat() }
+        setPadding(dp(20), dp(14), dp(20), dp(14))
+        setOnClickListener { onClick() }
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            .apply { topMargin = dp(14) }
+    }
+
+    /** Frosted progress bar. */
+    inner class GlassBar(ctx: android.content.Context) : View(ctx) {
+        var fraction = 0f
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(c: Canvas) {
+            val h = height.toFloat(); val r = h / 2
+            p.color = Color.parseColor("#4DFFFFFF"); c.drawRoundRect(RectF(0f, 0f, width.toFloat(), h), r, r, p)
+            p.color = accent
+            val w = (width * fraction).coerceAtLeast(h)
+            if (fraction > 0f) c.drawRoundRect(RectF(0f, 0f, w, h), r, r, p)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
 
-        val root = LinearLayout(this).apply {
+        val root = FrameLayout(this).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.parseColor("#CFF4E1"), Color.parseColor("#F1FBF6"), Color.parseColor("#A9E3C9")))
+        }
+        // soft glowing blobs behind the glass give it depth
+        fun blob(size: Int, color: String, gx: Int, gy: Int) = View(this).apply {
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor(color)) }
+            layoutParams = FrameLayout.LayoutParams(dp(size), dp(size), gx or gy)
+        }
+        root.addView(blob(260, "#6638D39B", Gravity.START, Gravity.TOP).apply { translationX = -dp(90).toFloat(); translationY = dp(40).toFloat() })
+        root.addView(blob(300, "#66FFFFFF", Gravity.END, Gravity.CENTER_VERTICAL).apply { translationX = dp(110).toFloat() })
+        root.addView(blob(240, "#5578D8B0", Gravity.START, Gravity.BOTTOM).apply { translationX = -dp(60).toFloat(); translationY = dp(60).toFloat() })
+
+        val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(60, 60, 60, 60)
+            setPadding(dp(20), dp(56), dp(20), dp(32))
         }
-        val title = TextView(this).apply { text = "Spotify Chukl"; textSize = 28f; gravity = Gravity.CENTER }
-        status = TextView(this).apply { textSize = 16f; gravity = Gravity.CENTER; setPadding(0, 40, 0, 20) }
-        song = TextView(this).apply { textSize = 20f; gravity = Gravity.CENTER; setPadding(0, 20, 0, 40) }
-        val button = Button(this).apply {
-            text = "Step 1: Allow access"
-            setOnClickListener { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        col.addView(text("Spotify Chukl", 32f, ink, true))
+        col.addView(text("Shows your song in the Minecraft HUD", 15f, inkSoft).apply { setPadding(0, dp(4), 0, 0) })
+
+        chip = text("", 13f, accent, true)
+        songTitle = text("", 24f, ink, true).apply { setPadding(0, dp(8), 0, 0); maxLines = 2 }
+        songArtist = text("", 16f, inkSoft).apply { setPadding(0, dp(2), 0, dp(14)); maxLines = 1 }
+        bar = GlassBar(this).apply { layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(10)) }
+        timeLeft = text("0:00", 12f, inkSoft)
+        timeRight = text("0:00", 12f, inkSoft).apply { gravity = Gravity.END }
+        val times = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(6), 0, 0)
+            addView(timeLeft, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(timeRight, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
-        val help = TextView(this).apply {
-            text = "Turn on Spotify Chukl in the list, then play a song in Spotify. " +
-                "Your HUD reads it from http://127.0.0.1:${Server.PORT}"
-            textSize = 13f; gravity = Gravity.CENTER; setPadding(0, 40, 0, 0)
-        }
-        listOf(title, status, song, button, help).forEach { root.addView(it) }
+        col.addView(card(chip, songTitle, songArtist, bar, times))
+
+        step1State = text("", 13f, accent, true)
+        col.addView(card(
+            text("Setup", 20f, ink, true),
+            text("1  Turn on sharing in Spotify", 16f, ink, true).apply { setPadding(0, dp(14), 0, 0) },
+            text("Spotify  >  Settings  >  Apps and devices  >  Device Broadcast Status  >  On", 14f, inkSoft).apply { setPadding(0, dp(4), 0, 0) },
+            step1State.apply { setPadding(0, dp(6), 0, 0) },
+            pill("Open Spotify") { openSpotify() },
+            text("2  Play a song, then start Minecraft", 16f, ink, true).apply { setPadding(0, dp(18), 0, 0) },
+            text("The HUD appears by itself. Nothing else to set up.", 14f, inkSoft).apply { setPadding(0, dp(4), 0, 0) }
+        ))
+
+        root.addView(ScrollView(this).apply { isFillViewport = true; addView(col) })
         setContentView(root)
         KeepAliveService.start(this)
     }
 
-    override fun onResume() { super.onResume(); handler.post(tick) }
+    private fun openSpotify() {
+        val i = packageManager.getLaunchIntentForPackage("com.spotify.music")
+        if (i != null) startActivity(i) else Toast.makeText(this, "Spotify is not installed", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onResume() { super.onResume(); KeepAliveService.start(this); handler.post(tick) }
     override fun onPause() { super.onPause(); handler.removeCallbacks(tick) }
 
-    private fun hasAccess(): Boolean =
-        Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-            ?.contains(packageName) == true
+    private fun fmt(ms: Long): String { val s = (ms / 1000).coerceAtLeast(0); return "%d:%02d".format(s / 60, s % 60) }
 
     private fun render() {
-        status.text = when {
-            !hasAccess() -> "Not allowed yet. Tap the button below."
-            !NowPlaying.spotifyFound -> "Ready. Open Spotify and play a song."
-            NowPlaying.playing -> "Playing"
-            else -> "Paused"
+        val found = NowPlaying.spotifyFound
+        step1State.text = if (found) "Done. Spotify is sharing." else "Waiting for Spotify... play a song after turning it on."
+        chip.text = when {
+            !found -> "NOT CONNECTED YET"
+            NowPlaying.playing -> "PLAYING"
+            else -> "PAUSED"
         }
-        song.text = if (NowPlaying.title.isEmpty()) "" else "${NowPlaying.title}\n${NowPlaying.artist}"
+        songTitle.text = if (NowPlaying.title.isEmpty()) "Nothing playing" else NowPlaying.title
+        songArtist.text = NowPlaying.artist
+        var pos = NowPlaying.positionMs
+        if (NowPlaying.playing && NowPlaying.updatedAt > 0) pos += System.currentTimeMillis() - NowPlaying.updatedAt
+        val dur = NowPlaying.durationMs
+        if (dur > 0 && pos > dur) pos = dur
+        bar.fraction = if (dur > 0) pos.toFloat() / dur else 0f
+        bar.invalidate()
+        timeLeft.text = fmt(pos)
+        timeRight.text = fmt(dur)
     }
 }
