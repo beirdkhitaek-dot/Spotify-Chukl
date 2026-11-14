@@ -2,65 +2,49 @@ package spotifychukl.style;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Text;
 
-/** Style 1: rounded glass card with cover art, accent progress bar and an optional lyrics panel. */
+/** Style "glass": liquid-glass swap-box card. Frosted body, bright top rim, cover with soft glow, knob progress bar. */
 public final class GlassStyle implements HudStyle {
-    private static final int W = 168, CARD_H = 56, LYRICS_GAP = 3, LYRICS_H = 40;
+    private static final int W = 172, CARD_H = 58, GAP = 3, LYRICS_H = 36;
 
     @Override public String id() { return "glass"; }
 
     @Override public int width() { return W; }
 
-    @Override public int height(boolean withLyrics) { return withLyrics ? CARD_H + LYRICS_GAP + LYRICS_H : CARD_H; }
+    @Override public int height(boolean withLyrics) { return withLyrics ? CARD_H + GAP + LYRICS_H : CARD_H; }
 
     @Override
     public void draw(DrawContext ctx, MinecraftClient mc, Frame f) {
         TextRenderer font = mc.textRenderer;
         int accent = f.accent();
-        int glow = accent & 0x00FFFFFF;
+        Draw.card(ctx, 0, 0, W, CARD_H, 10, accent);
 
-        // glass card: soft accent-tinted rim, dark translucent body, faint top highlight
-        Draw.roundRect(ctx, 0, 0, W, CARD_H, 7, 0x40000000 | glow);
-        Draw.roundRect(ctx, 1, 1, W - 2, CARD_H - 2, 6, 0xC4121216);
-        Draw.roundRect(ctx, 2, 2, W - 4, 10, 5, 0x10FFFFFF);
-
-        int tx = 10;
+        int tx = 12;
         if (f.texture() != null) {
-            Draw.roundRect(ctx, 7, 7, 42, 42, 4, 0xFF000000 | glow);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, f.texture(), 8, 8, 0.0F, 0.0F, 40, 40, 64, 64, 64, 64, 0xFFFFFFFF);
-            tx = 56;
+            Draw.roundRect(ctx, 5, 5, 48, 48, 9, Draw.alpha(accent, 0.28f));
+            Draw.cover(ctx, f.texture(), 8, 8, 42);
+            tx = 62;
         }
-        int maxW = W - tx - 8;
-        ctx.drawText(font, Text.literal(font.trimToWidth(f.title(), maxW)), tx, 9, 0xFFFFFFFF, false);
-        ctx.drawText(font, Text.literal(font.trimToWidth(f.artist(), maxW)), tx, 21, 0xFFB5B5BD, false);
+        int maxW = W - tx - 10;
+        Draw.text(ctx, font, f.title(), tx, 9, maxW, 0xFFFFFFFF);
+        Draw.text(ctx, font, f.artist(), tx, 20, maxW, 0xFFB8BECC);
 
-        int barW = W - tx - 8;
-        Draw.roundRect(ctx, tx, 36, barW, 3, 1, 0x40FFFFFF);
+        long pos = f.durationMs() > 0 ? Math.min(f.durationMs(), Math.max(0, f.elapsedMs())) : 0;
+        Draw.knobBar(ctx, tx, 37, maxW, f.durationMs() > 0 ? pos / (float) f.durationMs() : 0.08f, accent);
         if (f.durationMs() > 0) {
-            long pos = Math.min(f.durationMs(), Math.max(0, f.elapsedMs()));
-            int fill = Math.max(2, (int) (barW * pos / f.durationMs()));
-            Draw.roundRect(ctx, tx, 36, fill, 3, 1, accent);
-            String total = Draw.time(f.durationMs());
-            ctx.drawText(font, Text.literal(Draw.time(pos)), tx, 43, 0xFF9A9AA3, false);
-            ctx.drawText(font, Text.literal(total), tx + barW - font.getWidth(total), 43, 0xFF9A9AA3, false);
-        } else {
-            Draw.roundRect(ctx, tx, 36, Math.min(barW, 26), 3, 1, accent); // unknown length: short accent stub
+            String end = Draw.endTime(pos, f.durationMs());
+            ctx.drawText(font, Draw.time(pos), tx, 45, 0xFFA3A9B8, false);
+            ctx.drawText(font, end, tx + maxW - font.getWidth(end), 45, 0xFFA3A9B8, false);
         }
 
-        if (f.lyrics() != null) drawLyrics(ctx, font, f, glow);
-    }
-
-    private void drawLyrics(DrawContext ctx, TextRenderer font, Frame f, int glow) {
-        int y0 = CARD_H + LYRICS_GAP;
-        Draw.roundRect(ctx, 0, y0, W, LYRICS_H, 7, 0x40000000 | glow);
-        Draw.roundRect(ctx, 1, y0 + 1, W - 2, LYRICS_H - 2, 6, 0xC4121216);
-        int maxW = W - 16;
-        String[] l = f.lyrics();
-        ctx.drawText(font, Text.literal(font.trimToWidth(l[0], maxW)), 8, y0 + 6, 0xFF7E7E88, false);
-        ctx.drawText(font, Text.literal(font.trimToWidth(l[1], maxW)), 8, y0 + 16, f.accent(), false);
-        ctx.drawText(font, Text.literal(font.trimToWidth(l[2], maxW)), 8, y0 + 27, 0xFF7E7E88, false);
+        if (f.lyrics() != null) {
+            int y0 = CARD_H + GAP;
+            Draw.card(ctx, 0, y0, W, LYRICS_H, 10, accent);
+            String[] l = f.lyrics();
+            Draw.text(ctx, font, l[0], 10, y0 + 6, W - 20, 0xFF8A90A0);
+            Draw.text(ctx, font, l[1], 10, y0 + 16, W - 20, accent);
+            Draw.text(ctx, font, l[2], 10, y0 + 26, W - 20, 0xFF8A90A0);
+        }
     }
 }

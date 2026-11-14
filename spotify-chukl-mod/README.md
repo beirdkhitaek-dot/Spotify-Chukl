@@ -1,6 +1,13 @@
-# Spotify Chukl v1.8.1 (Fabric 1.21.11)
+# Spotify Chukl v1.9.0 (Fabric 1.21.11)
 
 Shows the song you are playing on Spotify as a HUD in Minecraft. Works on Android (Zalith) and desktop.
+
+## What's new in 1.9.0 - Liquid Glass
+- Every HUD style (except Krypton) was redesigned in a frosted "liquid glass" look: bright glass edge, soft shadow, glowing progress knob.
+- New look per style: Glass (swap card), Slate (grey notification stack), Spotify (green glass), Full (modal player with buttons), Mini, Vinyl, Compact.
+- Settings screen redesigned: frosted panel, pill tabs, a live connection light, and three themes (Glass, Light, Mint).
+- The Last.fm tab is now called "Backup" and is only needed if you use Last.fm.
+- How to use: press Right Shift, pick a Style, then adjust Size and Opacity in Options.
 
 ## What's new in 1.8.1
 - Setup with the app is now simpler: turn on "Device Broadcast Status" in Spotify. No special Android permission needed.

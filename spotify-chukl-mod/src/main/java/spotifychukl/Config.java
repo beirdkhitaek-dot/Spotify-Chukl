@@ -20,7 +20,7 @@ public final class Config {
     public int lyricsOffsetMs = 0;
     public int accentColor = 0xE0457B;
     public boolean customAccent = false;
-    public String guiTheme = "flat";
+    public String guiTheme = "glass";
     public int opacity = 100;
     public boolean remainingTime = true;
     public boolean scrollText = true;
@@ -50,7 +50,7 @@ public final class Config {
         if (instance.apiKey == null) instance.apiKey = "";
         if (instance.user == null) instance.user = "";
         if (instance.style == null || instance.style.isBlank()) instance.style = "glass";
-        if (instance.guiTheme == null || !java.util.List.of("flat", "glass", "light", "amoled").contains(instance.guiTheme)) instance.guiTheme = "flat";
+        if (instance.guiTheme == null || !java.util.List.of("glass", "light", "mint").contains(instance.guiTheme)) instance.guiTheme = "glass";
         if (instance.coverShape == null || !java.util.List.of("square", "rounded", "circle").contains(instance.coverShape)) instance.coverShape = "rounded";
         instance.opacity = Math.max(20, Math.min(100, instance.opacity));
         if (instance.scale < 0.5f || instance.scale > 4f) instance.scale = 1.0f;

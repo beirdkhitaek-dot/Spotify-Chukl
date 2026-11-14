@@ -2,62 +2,59 @@ package spotifychukl.style;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Text;
 
 /**
- * Style "slate": dark slate panel with a "NOW PLAYING" label, title, artist, a times row with a thin progress line, and
- * the lyrics (current line in the accent colour, next line dimmed) inside the same panel.
+ * Style "slate": a grey notification card with a second card peeking out behind it. Monochrome, no colour.
+ * Shows a small app label, title, artist and a thin white progress line.
  */
 public final class SlateStyle implements HudStyle {
-    private static final int W = 176, TOP_H = 54, LYRICS_H = 28;
+    private static final int W = 176, TOP_H = 58, GAP = 2, LYRICS_H = 24;
 
     @Override public String id() { return "slate"; }
 
     @Override public int width() { return W; }
 
-    @Override public int height(boolean withLyrics) { return withLyrics ? TOP_H + LYRICS_H : TOP_H; }
+    @Override public int height(boolean withLyrics) { return withLyrics ? TOP_H + GAP + LYRICS_H : TOP_H; }
+
+    private static void gray(DrawContext ctx, int x, int y, int w, int h, int r, boolean back) {
+        int a = back ? 0x88 : 0xD2;
+        Draw.glass(ctx, x, y, w, h, r, Draw.bg((a << 24) | 0x3A3D46), Draw.bg((a << 24) | 0x1E2026), back ? 0x40FFFFFF : 0x70FFFFFF);
+    }
 
     @Override
     public void draw(DrawContext ctx, MinecraftClient mc, Frame f) {
         TextRenderer font = mc.textRenderer;
-        int accent = f.accent();
-        int h = height(f.lyrics() != null);
+        gray(ctx, 6, 6, W - 12, TOP_H - 6, 8, true);
+        Draw.shadow(ctx, 0, 0, W, TOP_H - 6, 9);
+        gray(ctx, 0, 0, W, TOP_H - 6, 9, false);
 
-        Draw.roundRect(ctx, 0, 0, W, h, 4, 0xD0202024);
-
-        int tx = 8;
+        int tx = 10;
         if (f.texture() != null) {
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, f.texture(), 6, 6, 0.0F, 0.0F, 36, 36, 64, 64, 64, 64, 0xFFFFFFFF);
-            tx = 48;
+            Draw.cover(ctx, f.texture(), 7, 8, 36);
+            tx = 50;
         }
-        int maxW = W - tx - 8;
-        ctx.drawText(font, Text.literal("NOW PLAYING"), tx, 5, 0xFF7E7E88, false);
-        ctx.drawText(font, Text.literal(font.trimToWidth(f.title(), maxW)), tx, 15, 0xFFFFFFFF, false);
-        ctx.drawText(font, Text.literal(font.trimToWidth(f.artist(), maxW)), tx, 25, 0xFFA0A0AA, false);
+        int maxW = W - tx - 10;
+        ctx.drawText(font, "SPOTIFY CHUKL", tx, 6, 0xFF8E93A0, false);
+        String now = "now";
+        ctx.drawText(font, now, W - 8 - font.getWidth(now), 6, 0xFF6E7380, false);
+        Draw.text(ctx, font, f.title(), tx, 17, maxW, 0xFFFFFFFF);
+        Draw.text(ctx, font, f.artist(), tx, 28, maxW, 0xFFA8ADB8);
 
-        int rowY = 36;
-        String left = Draw.time(f.elapsedMs());
-        String right = f.durationMs() > 0 ? "-" + Draw.time(Math.max(0, f.durationMs() - f.elapsedMs())) : "--:--";
-        ctx.drawText(font, Text.literal(left), tx, rowY, 0xFF9A9AA3, false);
-        ctx.drawText(font, Text.literal(right), W - 8 - font.getWidth(right), rowY, 0xFF9A9AA3, false);
-
-        int barY = 47, barW = W - tx - 8;
-        ctx.fill(tx, barY, tx + barW, barY + 2, 0x40FFFFFF);
+        int barY = 41;
+        Draw.roundRect(ctx, tx, barY, maxW, 2, 1, 0x44FFFFFF);
         if (f.durationMs() > 0) {
             long pos = Math.min(f.durationMs(), Math.max(0, f.elapsedMs()));
-            ctx.fill(tx, barY, tx + Math.max(1, (int) (barW * pos / f.durationMs())), barY + 2, accent);
+            Draw.roundRect(ctx, tx, barY, Math.max(2, (int) (maxW * pos / f.durationMs())), 2, 1, 0xE6FFFFFF);
         }
 
         if (f.lyrics() != null) {
-            String[] l = f.lyrics();
-            String cur = l[1].isEmpty() ? l[2] : l[1];
-            String next = l[1].isEmpty() ? "" : l[2];
-            int y0 = TOP_H + 2;
-            ctx.fill(8, y0 - 2, W - 8, y0 - 1, 0x20FFFFFF);
-            ctx.drawText(font, Text.literal(font.trimToWidth(cur, W - 16)), 8, y0 + 2, accent, false);
-            ctx.drawText(font, Text.literal(font.trimToWidth(next, W - 16)), 8, y0 + 14, 0xFF6E6E78, false);
+            int y0 = TOP_H + GAP;
+            gray(ctx, 0, y0, W, LYRICS_H, 8, false);
+            String cur = f.lyrics()[1].isEmpty() ? f.lyrics()[2] : f.lyrics()[1];
+            String next = f.lyrics()[1].isEmpty() ? "" : f.lyrics()[2];
+            Draw.text(ctx, font, cur, 8, y0 + 4, W - 16, 0xFFFFFFFF);
+            Draw.text(ctx, font, next, 8, y0 + 14, W - 16, 0xFF6E7380);
         }
     }
 }

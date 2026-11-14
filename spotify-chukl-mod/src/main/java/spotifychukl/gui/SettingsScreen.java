@@ -5,6 +5,7 @@ import com.mojang.blaze3d.textures.FilterMode;
 import java.util.ArrayList;
 import java.util.List;
 import spotifychukl.Config;
+import spotifychukl.Tracker;
 import spotifychukl.HudRenderer;
 import spotifychukl.style.Draw;
 import spotifychukl.style.Frame;
@@ -31,15 +32,15 @@ public final class SettingsScreen extends Screen {
     private record Hit(int x, int y, int w, int h, Act press, Act drag) {}
 
     private static final int DESIGN_W = 290, DESIGN_H = 170;
-    private static final String[] TABS = {"Style", "Colour", "Options", "Account"};
-    private static final String[] THEMES = {"flat", "glass", "light", "amoled"};
+    private static final String[] TABS = {"Style", "Colour", "Options", "Backup"};
+    private static final String[] THEMES = {"glass", "light", "mint"};
     private static final int[] PRESETS = {0xE0457B, 0x4C7DFF, 0xFF9A1F, 0x2ECC71, 0x2DB7F5, 0x9B6BFF};
 
     private static Identifier wheel;
     private static int tab;
 
     // palette of the current theme
-    private int dim, panel, border, field, hover, text, muted;
+    private int dim, panel, border, field, hover, text, muted, panelTop, panelBot, rim, onAcc;
 
     private final List<Hit> hits = new ArrayList<>();
     private Hit active;
@@ -57,15 +58,18 @@ public final class SettingsScreen extends Screen {
 
     private String theme() { return Config.get().guiTheme; }
 
-    private boolean glass() { return "glass".equals(theme()); }
+    private boolean glass() { return true; }
 
     private void applyTheme() {
         switch (theme()) {
-            case "glass" -> { dim = 0xC006080E; panel = 0xFF111320; border = 0xFF2A2F40; field = 0xFF222634; hover = 0xFF2A2F40; text = 0xFFF0F0F4; muted = 0xFF8A8F9E; }
-            case "light" -> { dim = 0x80000000; panel = 0xFFF2F2F5; border = 0xFFC8C8D0; field = 0xFFDEDEE4; hover = 0xFFCDCDD6; text = 0xFF17171C; muted = 0xFF666672; }
-            case "amoled" -> { dim = 0xD0000000; panel = 0xFF000000; border = 0xFF26262C; field = 0xFF0F0F12; hover = 0xFF1C1C21; text = 0xFFF0F0F4; muted = 0xFF8A8A94; }
-            default -> { dim = 0xA0000000; panel = 0xFF16161A; border = 0xFF2A2A31; field = 0xFF1F1F25; hover = 0xFF2B2B33; text = 0xFFF0F0F4; muted = 0xFF8A8A94; }
+            case "light" -> { dim = 0x70101820; panelTop = 0xF2FAFBFD; panelBot = 0xEEE3E8EF; rim = 0xFFFFFFFF; border = 0x33000000; field = 0x1C000000; hover = 0x2E000000; text = 0xFF15181F; muted = 0xFF5B6270; }
+            case "mint" -> { dim = 0x80102018; panelTop = 0xF0DDF6EA; panelBot = 0xEEB9E7D1; rim = 0xFFFFFFFF; border = 0x40206A4C; field = 0x40FFFFFF; hover = 0x66FFFFFF; text = 0xFF0E3B2B; muted = 0xFF4F7A68; }
+            default -> { dim = 0x980A0E16; panelTop = 0xEE2A3040; panelBot = 0xEE11141D; rim = 0x80FFFFFF; border = 0x44FFFFFF; field = 0x26FFFFFF; hover = 0x3DFFFFFF; text = 0xFFF2F4F8; muted = 0xFF9AA1B2; }
         }
+        panel = panelTop;
+        int a = accent();
+        int lum = (((a >> 16) & 255) * 3 + ((a >> 8) & 255) * 6 + (a & 255)) / 10;
+        onAcc = lum > 150 ? 0xFF101014 : 0xFFFFFFFF;
     }
 
     private void glow(DrawContext c, int x, int y, int w, int h, int r, int rgb, int strength) {
@@ -76,9 +80,7 @@ public final class SettingsScreen extends Screen {
     }
 
     private void card(DrawContext c, int x, int y, int w, int h) {
-        Draw.roundRect(c, x, y, w, h, 9, 0x22FFFFFF);
-        Draw.roundRect(c, x + 1, y + 1, w - 2, h - 2, 8, 0xFF1A1D28);
-        Draw.roundRect(c, x + 2, y + 2, w - 4, 8, 6, 0x0CFFFFFF);
+        Draw.glass(c, x, y, w, h, 9, field, field, border);
     }
 
     private static int hsv(float h, float s, float v) {
@@ -180,15 +182,14 @@ public final class SettingsScreen extends Screen {
 
     private void button(DrawContext c, String label, int x, int y, int w, int h, boolean on, int mx, int my, Act press) {
         boolean over = inside(mx, my, x, y, w, h);
-        if (glass()) {
-            if (on) glow(c, x, y, w, h, 7, accent(), 0x60);
-            Draw.roundRect(c, x, y, w, h, 7, on ? accent() : (over ? hover : field));
-            if (!on) Draw.roundRect(c, x + 1, y + 1, w - 2, 5, 4, 0x0CFFFFFF);
+        if (on) {
+            glow(c, x, y, w, h, 7, accent(), 0x58);
+            Draw.glass(c, x, y, w, h, Math.min(8, h / 2), Draw.mix(0xFFFFFFFF, accent(), 0.80f), accent(), 0xB0FFFFFF);
         } else {
-            c.fill(x, y, x + w, y + h, on ? accent() : (over ? hover : field));
+            Draw.glass(c, x, y, w, h, Math.min(8, h / 2), over ? hover : field, over ? hover : field, border);
         }
         String t = Draw.fit(textRenderer, label, w - 6);
-        c.drawText(textRenderer, t, x + (w - textRenderer.getWidth(t)) / 2, y + (h - 8) / 2 + 1, on ? 0xFF101014 : text, false);
+        c.drawText(textRenderer, t, x + (w - textRenderer.getWidth(t)) / 2, y + (h - 8) / 2 + 1, on ? onAcc : text, false);
         hits.add(new Hit(x, y, w, h, press, null));
     }
 
@@ -218,7 +219,7 @@ public final class SettingsScreen extends Screen {
         if (glass()) {
             if (focused) glow(c, x, y, w, h, 6, accent(), 0x40);
             Draw.roundRect(c, x, y, w, h, 6, focused ? accent() : border);
-            Draw.roundRect(c, x + 1, y + 1, w - 2, h - 2, 5, 0xFF141722);
+            Draw.glass(c, x + 1, y + 1, w - 2, h - 2, 5, field, field, 0x00000000);
         } else {
             c.fill(x, y, x + w, y + h, focused ? accent() : border);
             c.fill(x + 1, y + 1, x + w - 1, y + h - 1, field);
@@ -242,31 +243,35 @@ public final class SettingsScreen extends Screen {
         mat.pushMatrix();
         mat.scale(s, s);
 
-        if (glass()) {
-            glow(c, px + pw / 2 - 90, py + ph - 14, 180, 10, 5, acc, 0x40);
-            Draw.roundRect(c, px - 1, py - 1, pw + 2, ph + 2, 13, 0x26FFFFFF);
-            Draw.roundRect(c, px, py, pw, ph, 12, panel);
-            Draw.roundRect(c, px + 2, py + 2, pw - 4, 12, 10, 0x0AFFFFFF);
-        } else {
-            c.fill(px - 1, py - 1, px + pw + 1, py + ph + 1, border);
-            c.fill(px, py, px + pw, py + ph, panel);
-        }
+        glow(c, px + pw / 2 - 90, py + ph - 14, 180, 10, 5, acc, 0x38);
+        Draw.shadow(c, px, py, pw, ph, 12);
+        Draw.glass(c, px, py, pw, ph, 12, panelTop, panelBot, rim);
 
         int x0 = px + 14, cw = pw - 28;
-        // header
-        String themeLabel = "Theme: " + Character.toUpperCase(theme().charAt(0)) + theme().substring(1);
-        int tw = Math.min(cw - 80, textRenderer.getWidth(themeLabel) + 12);
-        put(c, "Spotify Chukl", x0, py + 10, cw - tw - 8, acc);
-        button(c, themeLabel, px + pw - 14 - tw, py + 6, tw, 15, false, mx, my, (x, y) -> {
+        // header: logo chip, title, live connection status, theme switch
+        String themeLabel = Character.toUpperCase(theme().charAt(0)) + theme().substring(1);
+        int tw = Math.min(cw - 80, textRenderer.getWidth(themeLabel) + 14);
+        Draw.glass(c, x0, py + 7, 14, 14, 5, Draw.mix(0xFFFFFFFF, acc, 0.8f), acc, 0xB0FFFFFF);
+        c.drawText(textRenderer, "\u266A", x0 + 4, py + 10, onAcc, false);
+        String status = Tracker.status();
+        int stW = Math.min(110, textRenderer.getWidth(status) + 16);
+        put(c, "Spotify Chukl", x0 + 20, py + 10, cw - tw - stW - 34, text);
+        int stX = px + pw - 14 - tw - 6 - stW;
+        boolean good = Tracker.now() != null;
+        Draw.glass(c, stX, py + 7, stW, 14, 7, field, field, border);
+        Draw.roundRect(c, stX + 5, py + 12, 4, 4, 2, good ? 0xFF3DDC84 : 0xFFE0A030);
+        put(c, status, stX + 12, py + 10, stW - 15, muted);
+        button(c, themeLabel, px + pw - 14 - tw, py + 7, tw, 14, false, mx, my, (x, y) -> {
             int i = java.util.Arrays.asList(THEMES).indexOf(theme());
             cfg.guiTheme = THEMES[(i + 1) % THEMES.length];
         });
 
-        // tabs
-        int tabW = (cw - 3 * 4) / 4;
+        // tabs: one frosted track with the active tab lit up
+        int tabW = (cw - 3 * 3 - 6) / 4;
+        Draw.glass(c, x0, py + 25, cw, 20, 10, field, field, border);
         for (int i = 0; i < TABS.length; i++) {
             final int ti = i;
-            button(c, TABS[i], x0 + i * (tabW + 4), py + 26, tabW, 16, tab == i, mx, my, (x, y) -> {
+            button(c, TABS[i], x0 + 3 + i * (tabW + 3), py + 27, tabW, 16, tab == i, mx, my, (x, y) -> {
                 tab = ti;
                 setFocused(null);
                 userField.setFocused(false);
@@ -274,9 +279,8 @@ public final class SettingsScreen extends Screen {
             });
         }
 
-        int cy0 = py + 48, ch = ph - 48 - 28;
-        if (glass()) card(c, px + 8, cy0 - 3, pw - 16, ch + 6);
-        else c.fill(x0, cy0 - 3, x0 + cw, cy0 - 2, border);
+        int cy0 = py + 52, ch = ph - 52 - 30;
+        card(c, px + 8, cy0 - 3, pw - 16, ch + 6);
 
         boolean account = tab == 3;
         userField.visible = account;
@@ -288,7 +292,7 @@ public final class SettingsScreen extends Screen {
             default -> accountTab(c, x0, cy0, cw);
         }
 
-        button(c, "Done", px + pw - 14 - 44, py + ph - 24, 44, 16, false, mx, my, (x, y) -> close());
+        button(c, "Done", px + pw - 14 - 48, py + ph - 24, 48, 16, true, mx, my, (x, y) -> close());
         put(c, "Drag the HUD in chat to move it", x0, py + ph - 20, cw - 60, muted);
 
         mat.popMatrix();
@@ -355,10 +359,10 @@ public final class SettingsScreen extends Screen {
             cfg.customAccent = true;
         });
         int hy = cy0 + 30;
-        if (glass()) { glow(c, rx, hy, rw, 14, 6, accent(), 0x40); Draw.roundRect(c, rx, hy, rw, 14, 6, accent()); }
+        if (glass()) { glow(c, rx, hy, rw, 14, 6, accent(), 0x40); Draw.glass(c, rx, hy, rw, 14, 6, Draw.mix(0xFFFFFFFF, accent(), 0.8f), accent(), 0xB0FFFFFF); }
         else c.fill(rx, hy, rx + rw, hy + 14, accent());
         String hex = String.format("#%06X", cfg.accentColor & 0xFFFFFF);
-        c.drawText(textRenderer, hex, rx + (rw - textRenderer.getWidth(hex)) / 2, hy + 3, 0xFF101014, false);
+        c.drawText(textRenderer, hex, rx + (rw - textRenderer.getWidth(hex)) / 2, hy + 3, onAcc, false);
         int sw = Math.min(18, (rw - 5 * 4) / 6);
         for (int i = 0; i < PRESETS.length; i++) {
             int col = PRESETS[i], sx = rx + i * (sw + 4);
@@ -403,7 +407,9 @@ public final class SettingsScreen extends Screen {
 
     private void accountTab(DrawContext c, int x0, int cy0, int cw) {
         int fw = Math.min(230, cw);
-        put(c, "Last.fm username (optional)", x0, cy0, fw, muted);
+        userField.setEditableColor(text);
+        keyField.setEditableColor(text);
+        put(c, "Last.fm username (only if you use Last.fm)", x0, cy0, fw, muted);
         box(c, x0, cy0 + 10, fw, 18, userField.isFocused());
         put(c, "API key", x0, cy0 + 34, fw, muted);
         box(c, x0, cy0 + 44, fw, 18, keyField.isFocused());
