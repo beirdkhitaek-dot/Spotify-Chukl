@@ -16,6 +16,7 @@ import net.minecraft.util.Identifier;
 public final class HudRenderer {
     private static final int DEFAULT_ACCENT = 0xFFD51007;
     private static Identifier texture;
+    private static Identifier blur;
     private static int shownSerial = -1;
     private static int counter;
     private static int accent = DEFAULT_ACCENT;
@@ -31,6 +32,9 @@ public final class HudRenderer {
     public static Identifier currentTexture() { return texture; }
 
     public static int currentAccent() { return accent; }
+
+    /** Heavily blurred copy of the cover (16x16, smoothed when stretched): the frosted-glass background. */
+    public static Identifier currentBlur() { return blur; }
 
     private static final class ArtTexture extends NativeImageBackedTexture {
         ArtTexture(NativeImage image) {
@@ -70,6 +74,10 @@ public final class HudRenderer {
             mc.getTextureManager().destroyTexture(texture);
             texture = null;
         }
+        if (blur != null) {
+            mc.getTextureManager().destroyTexture(blur);
+            blur = null;
+        }
         accent = DEFAULT_ACCENT;
         int[] px = Tracker.art();
         if (px == null || px.length != 64 * 64) return;
@@ -82,8 +90,60 @@ public final class HudRenderer {
             mc.getTextureManager().registerTexture(id, new ArtTexture(image));
             texture = id;
             accent = accentFrom(px);
+            blur = makeBlur(mc, px);
         } catch (Throwable ignored) {
             texture = null;
+        }
+    }
+
+    /** Averages the 64x64 cover down to 16x16 and blurs it twice; stretched with linear filtering it is a smooth haze. */
+    private static Identifier makeBlur(MinecraftClient mc, int[] px) {
+        try {
+            final int n = 16;
+            float[][] ch = new float[3][n * n];
+            for (int y = 0; y < 64; y++) {
+                for (int x = 0; x < 64; x++) {
+                    int p = px[y * 64 + x], i = (y / 4) * n + (x / 4);
+                    ch[0][i] += ((p >> 16) & 255) / 16f;
+                    ch[1][i] += ((p >> 8) & 255) / 16f;
+                    ch[2][i] += (p & 255) / 16f;
+                }
+            }
+            for (int pass = 0; pass < 2; pass++) {
+                for (int c = 0; c < 3; c++) {
+                    float[] src = ch[c], dst = new float[n * n];
+                    for (int y = 0; y < n; y++) {
+                        for (int x = 0; x < n; x++) {
+                            float sum = 0;
+                            for (int dy = -1; dy <= 1; dy++) {
+                                for (int dx = -1; dx <= 1; dx++) {
+                                    sum += src[Math.max(0, Math.min(n - 1, y + dy)) * n + Math.max(0, Math.min(n - 1, x + dx))];
+                                }
+                            }
+                            dst[y * n + x] = sum / 9f;
+                        }
+                    }
+                    ch[c] = dst;
+                }
+            }
+            NativeImage image = new NativeImage(n, n, false);
+            for (int y = 0; y < n; y++) {
+                for (int x = 0; x < n; x++) {
+                    int i = y * n + x;
+                    float avg = (ch[0][i] + ch[1][i] + ch[2][i]) / 3f;
+                    int argb = 0xFF000000;
+                    for (int c = 0; c < 3; c++) {
+                        int v = Math.max(0, Math.min(255, Math.round(avg + (ch[c][i] - avg) * 1.3f)));
+                        argb |= v << (16 - 8 * c);
+                    }
+                    image.setColorArgb(x, y, argb);
+                }
+            }
+            Identifier id = Identifier.of("spotifychukl", "blur/" + (counter++));
+            mc.getTextureManager().registerTexture(id, new ArtTexture(image));
+            return id;
+        } catch (Throwable t) {
+            return null;
         }
     }
 

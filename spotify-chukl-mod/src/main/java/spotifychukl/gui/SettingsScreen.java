@@ -62,9 +62,9 @@ public final class SettingsScreen extends Screen {
 
     private void applyTheme() {
         switch (theme()) {
-            case "light" -> { dim = 0x70101820; panelTop = 0xF2FAFBFD; panelBot = 0xEEE3E8EF; rim = 0xFFFFFFFF; border = 0x33000000; field = 0x1C000000; hover = 0x2E000000; text = 0xFF15181F; muted = 0xFF5B6270; }
-            case "mint" -> { dim = 0x80102018; panelTop = 0xF0DDF6EA; panelBot = 0xEEB9E7D1; rim = 0xFFFFFFFF; border = 0x40206A4C; field = 0x40FFFFFF; hover = 0x66FFFFFF; text = 0xFF0E3B2B; muted = 0xFF4F7A68; }
-            default -> { dim = 0x980A0E16; panelTop = 0xEE2A3040; panelBot = 0xEE11141D; rim = 0x80FFFFFF; border = 0x44FFFFFF; field = 0x26FFFFFF; hover = 0x3DFFFFFF; text = 0xFFF2F4F8; muted = 0xFF9AA1B2; }
+            case "light" -> { dim = 0x30101820; panelTop = 0xCCFAFBFD; panelBot = 0xC8E3E8EF; rim = 0xFFFFFFFF; border = 0x33000000; field = 0x1C000000; hover = 0x2E000000; text = 0xFF15181F; muted = 0xFF5B6270; }
+            case "mint" -> { dim = 0x30102018; panelTop = 0xC8DDF6EA; panelBot = 0xC6B9E7D1; rim = 0xFFFFFFFF; border = 0x40206A4C; field = 0x40FFFFFF; hover = 0x66FFFFFF; text = 0xFF0E3B2B; muted = 0xFF4F7A68; }
+            default -> { dim = 0x40080B12; panelTop = 0xBE2A3040; panelBot = 0xCC11141D; rim = 0x80FFFFFF; border = 0x44FFFFFF; field = 0x26FFFFFF; hover = 0x3DFFFFFF; text = 0xFFF2F4F8; muted = 0xFF9AA1B2; }
         }
         panel = panelTop;
         int a = accent();
@@ -73,10 +73,7 @@ public final class SettingsScreen extends Screen {
     }
 
     private void glow(DrawContext c, int x, int y, int w, int h, int r, int rgb, int strength) {
-        for (int i = 3; i >= 1; i--) {
-            int a = Math.max(4, strength / (i + 1));
-            Draw.roundRect(c, x - i * 2, y - i * 2, w + i * 4, h + i * 4, r + i * 2, (a << 24) | (rgb & 0xFFFFFF));
-        }
+        Draw.glow(c, x, y, w, h, r, rgb, strength / 255f * 1.6f, 6);
     }
 
     private void card(DrawContext c, int x, int y, int w, int h) {
@@ -171,7 +168,12 @@ public final class SettingsScreen extends Screen {
 
     @Override public boolean shouldPause() { return false; }
 
-    @Override public void renderBackground(DrawContext c, int x, int y, float delta) {}
+    private boolean drawingBackground;
+
+    @Override
+    public void renderBackground(DrawContext c, int x, int y, float delta) {
+        if (drawingBackground) super.renderBackground(c, x, y, delta); // vanilla blur, drawn once, before our panel
+    }
 
     private boolean inside(int mx, int my, int x, int y, int w, int h) { return mx >= x && mx < x + w && my >= y && my < y + h; }
 
@@ -238,6 +240,8 @@ public final class SettingsScreen extends Screen {
         int acc = accent();
         int mx = (int) (mxr / s), my = (int) (myr / s);
 
+        drawingBackground = true;
+        try { super.renderBackground(c, mxr, myr, delta); } finally { drawingBackground = false; }
         c.fill(0, 0, width, height, dim);
         var mat = c.getMatrices();
         mat.pushMatrix();

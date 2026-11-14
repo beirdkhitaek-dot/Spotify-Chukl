@@ -1,6 +1,12 @@
-# Spotify Chukl v1.9.0 (Fabric 1.21.11)
+# Spotify Chukl v1.9.1 (Fabric 1.21.11)
 
 Shows the song you are playing on Spotify as a HUD in Minecraft. Works on Android (Zalith) and desktop.
+
+## What's new in 1.9.1 - Real Glow and Blur
+- The HUD background is now a real blur of the album cover, so the glass picks up the colours of the song.
+- Real soft glow and shadow: they fade out smoothly instead of showing hard rings.
+- The settings screen blurs the game behind it (uses Minecraft's own menu blur, so it follows Options > Video > Menu Background Blurriness).
+- How to use: nothing to set up. Play a song and the HUD uses the cover automatically.
 
 ## What's new in 1.9.0 - Liquid Glass
 - Every HUD style (except Krypton) was redesigned in a frosted "liquid glass" look: bright glass edge, soft shadow, glowing progress knob.

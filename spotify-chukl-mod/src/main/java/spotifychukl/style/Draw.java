@@ -1,6 +1,7 @@
 package spotifychukl.style;
 
 import spotifychukl.Config;
+import spotifychukl.HudRenderer;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
@@ -161,24 +162,65 @@ public final class Draw {
         if (h >= 18 && w >= 18) roundRect(ctx, x + 3, y + 2, w - 6, Math.max(4, h / 3), Math.max(1, r - 2), 0x12FFFFFF);
     }
 
-    /** Soft shadow under a panel so it floats above the game. */
-    public static void shadow(DrawContext ctx, int x, int y, int w, int h, int r) {
-        for (int i = 3; i >= 1; i--) roundRect(ctx, x - i + 1, y + i, w + 2 * i - 2, h + i, r + i, 0x0C000000);
+    /**
+     * Real soft glow: stacked rounded outlines whose alpha follows a gaussian, so the light fades smoothly with
+     * distance instead of showing hard rings. {@code n} is the reach in pixels, {@code strength} 0..1 at the edge.
+     */
+    public static void glow(DrawContext ctx, int x, int y, int w, int h, int r, int rgb, float strength, int n) {
+        double sigma = Math.max(1.0, n * 0.45);
+        for (int i = n; i >= 1; i--) {
+            double outer = Math.exp(-(double) (i * i) / (2 * sigma * sigma));
+            double inner = Math.exp(-(double) ((i - 1) * (i - 1)) / (2 * sigma * sigma));
+            int a = (int) Math.round(255.0 * strength * (inner - outer) * 1.6);
+            if (a < 1) continue;
+            roundRect(ctx, x - i, y - i, w + 2 * i, h + 2 * i, r + i, (Math.min(255, a) << 24) | (rgb & 0xFFFFFF));
+        }
     }
 
-    /** Standard dark glass card tinted a little with the accent colour. Returns nothing; honours the opacity setting. */
+    /** Soft drop shadow under a panel so it floats above the game. */
+    public static void shadow(DrawContext ctx, int x, int y, int w, int h, int r) {
+        glow(ctx, x, y + 2, w, h, r, 0x000000, 0.55f, 7);
+    }
+
+    /** The blurred cover texture drawn inside a rounded rectangle (frosted background). */
+    public static void blurFill(DrawContext ctx, Identifier tex, int x, int y, int w, int h, int r) {
+        int a = Math.round(255 * Config.get().opacity / 100f);
+        int color = (a << 24) | 0xFFFFFF;
+        r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+        for (int row = 0; row < h; row++) {
+            int in = insetOf(row, h, r);
+            int rw = w - 2 * in;
+            if (rw <= 0) continue;
+            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, tex, x + in, y + row, in * 15f / w, row * 15f / h, rw, 1,
+                Math.max(1, Math.round(rw * 15f / w)), 1, 16, 16, color);
+        }
+    }
+
+    /**
+     * Frosted glass card. The body shows a blurred copy of the album cover (real blur, soft colours), with a dark
+     * glass layer on top for readability, a bright rim, a soft shadow and a coloured glow.
+     */
     public static void card(DrawContext ctx, int x, int y, int w, int h, int r, int accent) {
         shadow(ctx, x, y, w, h, r);
-        glass(ctx, x, y, w, h, r, bg(mix(GLASS_TOP, accent, 0.14f)), bg(mix(GLASS_BOT, accent, 0.07f)), mix(GLASS_RIM, accent, 0.30f));
+        glow(ctx, x, y, w, h, r, accent & 0xFFFFFF, 0.38f, 6);
+        Identifier blur = HudRenderer.currentBlur();
+        if (blur != null) {
+            blurFill(ctx, blur, x, y, w, h, r);
+            glass(ctx, x, y, w, h, r, 0x5A10131C, 0xA00B0D14, mix(GLASS_RIM, accent, 0.30f));
+        } else {
+            roundRect(ctx, x, y, w, h, r, bg(0xFF14161E));
+            glass(ctx, x, y, w, h, r, bg(mix(0xB02C3242, accent, 0.14f)), bg(mix(0xC012151F, accent, 0.07f)), mix(GLASS_RIM, accent, 0.30f));
+        }
     }
 
-    /** Glass progress bar: frosted track, accent fill and a glowing white knob. */
+    /** Glass progress bar: frosted track, accent fill and a softly glowing white knob. */
     public static void knobBar(DrawContext ctx, int x, int y, int w, float fraction, int accent) {
         roundRect(ctx, x, y, w, 4, 2, 0x4DFFFFFF);
         fraction = Math.max(0f, Math.min(1f, fraction));
         int fill = Math.max(4, (int) (w * fraction));
+        glow(ctx, x, y, fill, 4, 2, accent & 0xFFFFFF, 0.55f, 4);
         roundRect(ctx, x, y, fill, 4, 2, accent);
-        roundRect(ctx, x + fill - 5, y - 3, 10, 10, 5, alpha(accent, 0.30f));
+        glow(ctx, x + fill - 3, y - 1, 6, 6, 3, accent & 0xFFFFFF, 0.75f, 4);
         roundRect(ctx, x + fill - 3, y - 1, 6, 6, 3, 0xFFFFFFFF);
     }
 
