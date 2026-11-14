@@ -15,6 +15,7 @@ class SpotifyReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, i: Intent) {
         val now = System.currentTimeMillis()
         NowPlaying.spotifyFound = true
+        NowPlaying.lastEventAt = now
         val newTrack = i.getStringExtra("track")
         if (newTrack != null) {
             if (newTrack != NowPlaying.title) { NowPlaying.positionMs = 0; NowPlaying.updatedAt = now }

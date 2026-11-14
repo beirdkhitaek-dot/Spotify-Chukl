@@ -10,8 +10,10 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -35,6 +37,7 @@ class MainActivity : Activity() {
     private lateinit var timeRight: TextView
     private lateinit var bar: GlassBar
     private lateinit var step1State: TextView
+    private lateinit var step3State: TextView
     private val handler = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() { render(); handler.postDelayed(this, 500) }
@@ -125,6 +128,7 @@ class MainActivity : Activity() {
         col.addView(card(chip, songTitle, songArtist, bar, times))
 
         step1State = text("", 13f, accent, true)
+        step3State = text("", 13f, accent, true)
         col.addView(card(
             text("Setup", 20f, ink, true),
             text("1  Turn on sharing in Spotify", 16f, ink, true).apply { setPadding(0, dp(14), 0, 0) },
@@ -132,12 +136,33 @@ class MainActivity : Activity() {
             step1State.apply { setPadding(0, dp(6), 0, 0) },
             pill("Open Spotify") { openSpotify() },
             text("2  Play a song, then start Minecraft", 16f, ink, true).apply { setPadding(0, dp(18), 0, 0) },
-            text("The HUD appears by itself. Nothing else to set up.", 14f, inkSoft).apply { setPadding(0, dp(4), 0, 0) }
+            text("The HUD appears by itself.", 14f, inkSoft).apply { setPadding(0, dp(4), 0, 0) },
+            text("3  Keep it running (important)", 16f, ink, true).apply { setPadding(0, dp(18), 0, 0) },
+            text("Phones stop background apps while you play. If new songs stop showing, this is why. Allow it below.", 14f, inkSoft).apply { setPadding(0, dp(4), 0, 0) },
+            step3State.apply { setPadding(0, dp(6), 0, 0) },
+            pill("Allow background running") { allowBackground() },
+            pill("Open app settings") { openAppSettings() }
         ))
 
         root.addView(ScrollView(this).apply { isFillViewport = true; addView(col) })
         setContentView(root)
         KeepAliveService.start(this)
+    }
+
+    private fun ignoringBattery(): Boolean =
+        (getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName)
+
+    private fun allowBackground() {
+        try {
+            startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+        } catch (_: Exception) {
+            openAppSettings()
+        }
+    }
+
+    /** Phone makers hide extra switches here (Auto-start, Battery: No restrictions). */
+    private fun openAppSettings() {
+        startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
     }
 
     private fun openSpotify() {
@@ -152,7 +177,13 @@ class MainActivity : Activity() {
 
     private fun render() {
         val found = NowPlaying.spotifyFound
-        step1State.text = if (found) "Done. Spotify is sharing." else "Waiting for Spotify... play a song after turning it on."
+        val ago = if (NowPlaying.lastEventAt > 0) (System.currentTimeMillis() - NowPlaying.lastEventAt) / 1000 else -1
+        step1State.text = when {
+            !found -> "Waiting for Spotify... play a song after turning it on."
+            ago in 0..59 -> "Done. Spotify is sharing (last update ${ago}s ago)."
+            else -> "Done. Spotify is sharing (last update ${ago / 60} min ago)."
+        }
+        step3State.text = if (ignoringBattery()) "Done. Background running is allowed." else "Not allowed yet. Tap the button below."
         chip.text = when {
             !found -> "NOT CONNECTED YET"
             NowPlaying.playing -> "PLAYING"

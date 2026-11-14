@@ -12,6 +12,7 @@ object NowPlaying {
     @Volatile var durationMs: Long = 0
     @Volatile var updatedAt: Long = 0
     @Volatile var spotifyFound: Boolean = false
+    @Volatile var lastEventAt: Long = 0
 
     fun toJson(): String {
         // Position keeps moving while playing, so work it out from the last update.
