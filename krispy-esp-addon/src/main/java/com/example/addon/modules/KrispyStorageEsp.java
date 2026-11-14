@@ -22,7 +22,7 @@ import java.util.List;
 
 /** Krispy-style storage ESP: soft filled boxes with a glow, per-storage toggles and colors. */
 public class KrispyStorageEsp extends Module {
-    private static final int GLOW_LAYERS = 4;
+    private static final int GLOW_LAYERS = 16;
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgGlow = settings.createGroup("Glow");
@@ -73,15 +73,15 @@ public class KrispyStorageEsp extends Module {
 
     private final Setting<Boolean> glow = sgGlow.add(new BoolSetting.Builder()
         .name("glow")
-        .description("Soft glow around each box.")
+        .description("Soft neon glow around each box that fades out smoothly.")
         .defaultValue(true)
         .build()
     );
 
     private final Setting<Integer> glowStrength = sgGlow.add(new IntSetting.Builder()
         .name("glow-strength")
-        .description("How strong the glow is.")
-        .defaultValue(65)
+        .description("How bright the glow is.")
+        .defaultValue(80)
         .range(0, 100)
         .sliderMax(100)
         .visible(glow::get)
@@ -90,11 +90,18 @@ public class KrispyStorageEsp extends Module {
 
     private final Setting<Integer> glowSpread = sgGlow.add(new IntSetting.Builder()
         .name("glow-spread")
-        .description("How far the glow reaches.")
-        .defaultValue(18)
-        .range(6, 28)
-        .sliderMax(28)
+        .description("How far the glow reaches, in percent of a block.")
+        .defaultValue(35)
+        .range(6, 80)
+        .sliderMax(80)
         .visible(glow::get)
+        .build()
+    );
+
+    private final Setting<Boolean> brightCore = sgGlow.add(new BoolSetting.Builder()
+        .name("bright-core")
+        .description("Glowing white-hot edges and a bright inner light, like a neon tube.")
+        .defaultValue(true)
         .build()
     );
 
@@ -115,9 +122,10 @@ public class KrispyStorageEsp extends Module {
     private final List<Entry> entries = new ArrayList<>();
     private final Color side = new Color();
     private final Color line = new Color();
+    private final Color hot = new Color();
 
     public KrispyStorageEsp() {
-        super(AddonTemplate.CATEGORY, "krispy-storage-esp", "Krispy-style storage ESP with a soft glow.");
+        super(AddonTemplate.CATEGORY, "krispy-storage-esp", "Krispy-style storage ESP with a deep neon glow.");
 
         add("chest", Blocks.CHEST, 156, 91, 0);
         add("trapped-chest", Blocks.TRAPPED_CHEST, 255, 205, 64);
@@ -167,7 +175,7 @@ public class KrispyStorageEsp extends Module {
         return null;
     }
 
-    private void fill(Render3DEvent event, double x, double y, double z, double grow, SettingColor c, int a) {
+    private void fill(Render3DEvent event, double x, double y, double z, double grow, Color c, int a) {
         if (a <= 0) return;
         side.set(c);
         side.a = Math.min(255, a);
@@ -196,19 +204,35 @@ public class KrispyStorageEsp extends Module {
 
             SettingColor c = e.color.get();
 
-            // Glow: stacked, slightly larger translucent layers fading outwards
+            double bx = pos.getX(), by = pos.getY(), bz = pos.getZ();
+
+            // Deep glow: many thin shells whose opacity follows a gaussian, so the light is brightest at the box
+            // and fades out smoothly with no visible steps.
             if (doGlow) {
                 double reach = glowSpread.get() / 100.0;
                 double strength = glowStrength.get() / 100.0;
                 for (int i = GLOW_LAYERS; i >= 1; i--) {
-                    double t = (double) i / GLOW_LAYERS;
-                    double grow = reach * t;
-                    int a = (int) Math.round(120 * strength * (1.0 - t * 0.8) / GLOW_LAYERS * 2);
-                    fill(event, pos.getX(), pos.getY(), pos.getZ(), grow, c, a);
+                    double t0 = (i - 1.0) / GLOW_LAYERS, t1 = (double) i / GLOW_LAYERS;
+                    double d = Math.exp(-t0 * t0 * 5.0) - Math.exp(-t1 * t1 * 5.0);
+                    int a = (int) Math.round(255 * strength * d * 0.55);
+                    if (a >= 1) fill(event, bx, by, bz, reach * t1, c, a);
                 }
             }
 
-            fill(event, pos.getX(), pos.getY(), pos.getZ(), 0, c, alpha.get());
+            fill(event, bx, by, bz, 0, c, alpha.get());
+
+            if (brightCore.get()) {
+                // white-hot version of the colour for the core
+                hot.set(c.r + (255 - c.r) * 55 / 100, c.g + (255 - c.g) * 55 / 100, c.b + (255 - c.b) * 55 / 100, 255);
+                fill(event, bx, by, bz, -boxSize.get() * 0.10, hot, 34);
+                double half = boxSize.get() / 2.0;
+                for (int p = 0; p < 3; p++) {
+                    double g = half + p * 0.010;
+                    hot.a = 255 - p * 85;
+                    event.renderer.box(bx + 0.5 - g, by + 0.5 - g, bz + 0.5 - g, bx + 0.5 + g, by + 0.5 + g, bz + 0.5 + g,
+                        hot, hot, ShapeMode.Lines, 0);
+                }
+            }
 
             if (tracers.get()) {
                 double ox, oy, oz;
